@@ -30,8 +30,7 @@ contract Voting {
     }
 
     // Checks if a candidate with the given name already exists.
-    // Solidity requires explicit type conversions when working with strings. By converting to bytes, you ensure that the name string is properly encoded before being hashed.
-    // This is a common practice in Solidity to avoid issues related to the internal representation of strings and to ensure consistent hashing behavior.
+    // Solidity requires explicit type conversions when working with strings. By converting to bytes, you ensure that the name string is properly encoded before being hashed. This is done to avoid issues related to the internal representation of strings and to ensure consistent hashing behavior.
     function candidateNameExists(string memory _name) internal view returns (bool) {
         for (uint256 i = 0; i < candidates.length; i++) {
             if (keccak256(bytes(candidates[i].name)) == keccak256(bytes(_name))) return true;

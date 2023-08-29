@@ -4,101 +4,76 @@ pragma solidity ^0.8.4;
 
 contract Voting {
     // Define an Appropriate Data Type to Store Candidates
-
-    address public owner;
-    mapping(address => bool) public voters;
-
     struct Candidate {
         uint index;
         string name;
         uint voteCount;
-        string externalId;
     }
 
-    mapping(string => Candidate) candidates;
-    string[] candidateExternalIds;
+    // Define an Appropriate Data Type to Track If Voter has Already Voted
+    mapping(address => bool) public voters;
+    Candidate[] public candidates;
+    address public owner;
 
     constructor() {
         owner = msg.sender;
     }
 
-    function generateUniqueId() private view returns (string memory) {
-        bytes32 hash = keccak256(abi.encodePacked(block.timestamp, block.difficulty));
-
-        string memory uniqueId = string(toBase32String(hash));
-        require(bytes(uniqueId).length == 12, "Generated unique ID not of length 12");
-        return uniqueId;
-    }
-
-    function toBase32String(bytes32 data) private pure returns (string memory) {
-        bytes memory charSet = "0123456789abcdefghjkmnpqrstuvwxyz";
-        bytes memory result = new bytes(12);
-
-        for (uint256 i = 0; i < 12; i++) {
-            result[i] = charSet[uint8(data[i]) % charSet.length];
+    // Gets the index of a candidate by name
+    function getCandidateIndexByName(string memory _name) internal view returns (uint) {
+        for (uint256 i = 0; i < candidates.length; i++) {
+            if (keccak256(bytes(candidates[i].name)) == keccak256(bytes(_name))) {
+                return i;
+            }
         }
-
-        return string(result);
+        return candidates.length;
     }
 
-    function pushCandidateExternalId(string memory _externalId) private {
-        candidateExternalIds.push(_externalId);
-    }
-
-    function candidatesCount() public view returns (uint) {
-        return candidateExternalIds.length;
+    // Checks if a candidate with the given name already exists.
+    // Solidity requires explicit type conversions when working with strings. By converting to bytes, you ensure that the name string is properly encoded before being hashed.
+    // This is a common practice in Solidity to avoid issues related to the internal representation of strings and to ensure consistent hashing behavior.
+    function candidateNameExists(string memory _name) internal view returns (bool) {
+        for (uint256 i = 0; i < candidates.length; i++) {
+            if (keccak256(bytes(candidates[i].name)) == keccak256(bytes(_name))) return true;
+        }
+        return false;
     }
 
     // Adds New Candidate
     function addCandidate(string memory _name) public {
         require(msg.sender == owner, "Only owner can add candidates");
-        string memory externalId = generateUniqueId();
-        candidates[externalId] = Candidate({
-        index: candidateExternalIds.length,
-        name: _name,
-        voteCount: 0,
-        externalId: externalId
-        });
-        pushCandidateExternalId(externalId);
-    }
+        require(!candidateNameExists(_name), "Candidate with this name already exists");
 
-    function getCandidates() public view returns (Candidate[] memory) {
-        uint count = candidatesCount();
-        require(count > 0, "No candidates available"); // Handle empty list
-
-        Candidate[] memory allCandidates = new Candidate[](count);
-        for (uint i = 0; i < count; i++) {
-            string memory externalId = candidateExternalIds[i];
-            allCandidates[i] = candidates[externalId];
-        }
-
-        return allCandidates;
+        candidates.push(Candidate({
+            index: candidates.length,
+            name: _name,
+            voteCount: 0
+        }));
     }
 
     // Removes Already Added Candidate
-    function removeCandidate(string memory _externalId) public {
-        require(msg.sender == owner, "Only owner can remove candidates"); // Ensures that the sender of the transaction is the same as the owner of the contract.
-        require(bytes(_externalId).length > 0, "Invalid candidate external ID"); // Ensures that the external ID is not an empty string.
+    function removeCandidate(string memory _name) public {
+        require(msg.sender == owner, "Only owner can remove candidates");
+        uint candidateIndex = getCandidateIndexByName(_name);
+        require(candidateIndex < candidates.length, "Candidate not found");
 
-        uint indexToRemove = candidates[_externalId].index;
+        candidates[candidateIndex] = candidates[candidates.length - 1];
+        candidates.pop();
+    }
 
-        delete candidates[_externalId];
-
-        // swapping the _externalId at the indexToRemove with the _externalId at the end of the array.
-        // This is to maintain the order of the candidateExternalIds array while removing a candidate.
-        candidateExternalIds[indexToRemove] = candidateExternalIds[candidateExternalIds.length - 1];
-        candidateExternalIds.pop();
+    // Retrieves All Candidates for Viewing
+    function getAllCandidates() public view returns (Candidate[] memory) {
+        return candidates;
     }
 
     // Allows Voter to Cast a Vote for a Single Candidate
-    function castVote(string memory _externalId) public {
+    function castVote(string memory _name) public {
         require(!voters[msg.sender], "You've already voted!");
-        require(bytes(_externalId).length > 0, "Invalid candidate external ID");
+        uint candidateIndex = getCandidateIndexByName(_name);
+        require(candidateIndex < candidates.length, "Candidate not found");
 
-        // Update the vote count for the candidate
-        candidates[_externalId].voteCount++;
+        candidates[candidateIndex].voteCount++;
 
-        // Mark the voter as voted
         voters[msg.sender] = true;
     }
 }
